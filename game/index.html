@@ -3,17 +3,191 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Dodger</title>
+<title>Solstice Heat — an open-world crime game</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* Read aloud, never shown: the status line screen readers announce. */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #12101c; font-family: 'Segoe UI', Arial, sans-serif; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .hidden { display: none !important; }
+  .disabled { opacity: .35; pointer-events: none; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #f4efe6; z-index: 5; }
+  .panel { background: rgba(10, 14, 22, .74); border: 1px solid rgba(255, 255, 255, .16); border-radius: 8px; backdrop-filter: blur(3px); }
+  /* mission panel — top left */
+  #missionPanel { position: absolute; top: 14px; left: 14px; width: 300px; padding: 9px 12px; }
+  #mpJob { font-size: 10px; letter-spacing: 2px; color: #ff9e3d; font-weight: 700; }
+  #mpName { font-size: 19px; font-weight: 800; letter-spacing: 1px; margin: 1px 0; }
+  #mpObjective { font-size: 12px; color: #d8d2c6; line-height: 1.3; }
+  #mpStageRow { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  #mpStageBar { flex: 1; height: 4px; background: rgba(255,255,255,.15); border-radius: 2px; overflow: hidden; }
+  #mpStageFill { height: 100%; width: 0; background: #35d0ba; }
+  #mpStageText { font-size: 9px; letter-spacing: 1px; color: #9aa2ad; }
+  #mpTimer { font-size: 13px; font-weight: 700; color: #ffd23d; }
+  #mpTimer.urgent { color: #ff5e4d; }
+  #mpProgress { font-size: 11px; color: #35d0ba; font-weight: 700; }
+  /* wanted — top centre */
+  #wantedBox { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); text-align: center; padding: 5px 18px; }
+  #wantedLabel { font-size: 12px; letter-spacing: 4px; font-weight: 800; color: #9aa2ad; }
+  #wantedBox.hot #wantedLabel { color: #ffb43d; }
+  #stars span { font-size: 21px; color: #3c4250; margin: 0 1px; }
+  #stars span.on { color: #ffb43d; text-shadow: 0 0 8px rgba(255,180,61,.8); }
+  /* stats — top right */
+  #statsBox { position: absolute; top: 14px; right: 14px; text-align: right; padding: 8px 12px; }
+  #cash { font-size: 24px; font-weight: 800; color: #7cfc9a; }
+  #clockRow { font-size: 14px; color: #d8d2c6; }
+  #day { font-size: 10px; letter-spacing: 2px; color: #9aa2ad; }
+  /* police tracker — left */
+  #policePanel { position: absolute; top: 158px; left: 14px; width: 252px; padding: 8px 10px; }
+  #ppTitle { font-size: 10px; letter-spacing: 2px; color: #7fd4ff; font-weight: 700; margin-bottom: 5px; }
+  .punit { display: grid; grid-template-columns: 1fr 42px 78px; font-size: 11px; padding: 2px 0; border-top: 1px solid rgba(255,255,255,.07); }
+  .pname { font-weight: 700; color: #e8e4da; }
+  .pdist { color: #9aa2ad; text-align: right; }
+  .pstate { text-align: right; font-weight: 700; font-size: 10px; }
+  .pstate.ramming { color: #ff5e4d; } .pstate.pursuit { color: #ffd23d; }
+  .pstate.roadblock { color: #ff9e3d; } .pstate.spotlight { color: #7fd4ff; }
+  .pstate.responding { color: #9aa2ad; } .pstate.disabled { color: #666; }
+  .punit.air .pname { color: #7fd4ff; }
+  /* weapon bar — right */
+  #weaponBar { position: absolute; top: 158px; right: 14px; width: 158px; display: flex; flex-direction: column; gap: 4px; }
+  .wslot { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 6px; padding: 4px 8px; font-size: 11px; background: rgba(10,14,22,.7); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; }
+  .wslot.active { border-color: #ff9e3d; background: rgba(60,32,10,.8); }
+  .wslot.locked { opacity: .45; }
+  .wkey { color: #9aa2ad; font-weight: 700; }
+  .wname { font-weight: 700; letter-spacing: 1px; }
+  .wammo { color: #ffd23d; font-size: 10px; }
+  /* minimap + player — bottom left */
+  #minimapWrap { position: absolute; bottom: 14px; left: 14px; width: 176px; height: 176px; border-radius: 50%; border: 3px solid rgba(255,255,255,.32); box-shadow: 0 2px 14px rgba(0,0,0,.5); overflow: hidden; }
+  #minimap { width: 176px; height: 176px; display: block; }
+  #playerBox { position: absolute; bottom: 14px; left: 204px; width: 250px; padding: 8px 10px; display: flex; gap: 9px; align-items: center; }
+  #rafaPortrait { width: 46px; height: 46px; border-radius: 6px; border: 1px solid rgba(255,255,255,.2); }
+  #playerBars { flex: 1; }
+  .bar { height: 7px; background: rgba(255,255,255,.14); border-radius: 3px; overflow: hidden; margin: 3px 0; }
+  #healthFill { height: 100%; width: 100%; background: linear-gradient(90deg, #ff5e4d, #7cfc9a); }
+  #respectFill { height: 100%; width: 0; background: #35d0ba; }
+  #respectRank { font-size: 9px; letter-spacing: 1px; color: #35d0ba; font-weight: 700; }
+  #respectNum { font-size: 9px; color: #9aa2ad; }
+  /* dialogue — bottom centre */
+  #location { position: absolute; bottom: 104px; left: 56%; transform: translateX(-50%); font-size: 11px; letter-spacing: 2px; color: rgba(244,239,230,.8); text-shadow: 0 1px 3px #000; }
+  #dialogueBox { position: absolute; bottom: 14px; left: 56%; transform: translateX(-50%); width: 420px; padding: 9px 12px; display: flex; gap: 10px; align-items: center; }
+  #dlgPortrait { width: 56px; height: 56px; border-radius: 6px; border: 1px solid rgba(255,255,255,.2); }
+  #dlgName { font-size: 10px; letter-spacing: 2px; color: #ff9e3d; font-weight: 800; }
+  #dlgText { font-size: 13px; line-height: 1.35; color: #f4efe6; }
+  /* vehicle / radio — bottom right */
+  #vehiclePanel { position: absolute; bottom: 14px; right: 14px; width: 212px; padding: 8px 12px; text-align: right; }
+  #vpMode { font-size: 9px; letter-spacing: 2px; color: #9aa2ad; }
+  #vpName { font-size: 13px; font-weight: 800; letter-spacing: 1px; color: #e8e4da; }
+  #vpSpeedRow { margin: 2px 0; }
+  #vpSpeed { font-size: 34px; font-weight: 800; color: #f4efe6; }
+  #vpSpeedRow small { font-size: 11px; color: #9aa2ad; }
+  #vpCondBar { height: 5px; background: rgba(255,255,255,.14); border-radius: 3px; overflow: hidden; }
+  #vpCondFill { height: 100%; width: 100%; }
+  #vpCondFill.good { background: #7cfc9a; } #vpCondFill.warn { background: #ffd23d; } #vpCondFill.bad { background: #ff5e4d; }
+  #vpCondText { font-size: 9px; color: #9aa2ad; letter-spacing: 1px; }
+  #radioStation { font-size: 11px; color: #35d0ba; font-weight: 700; margin-top: 5px; }
+  #radioTrack { font-size: 10px; color: #9aa2ad; }
+  /* toast / crosshair / hints / vignette */
+  #toast { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); background: rgba(255,158,61,.92); color: #20140a; font-weight: 800; font-size: 13px; letter-spacing: 1px; padding: 6px 16px; border-radius: 6px; }
+  #crosshair { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; transform: translate(-50%,-50%); border: 1px solid rgba(255,255,255,.7); border-radius: 50%; }
+  #crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 2px; height: 2px; background: #fff; transform: translate(-50%,-50%); }
+  #hints { position: absolute; top: 118px; left: 50%; transform: translateX(-50%); display: flex; gap: 14px; font-size: 9px; color: rgba(244,239,230,.72); text-shadow: 0 1px 2px #000; }
+  #hints b { color: #ffd23d; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 52%, rgba(190,0,0,.6) 100%); opacity: 0; z-index: 6; }
+  /* menus */
+  .screen { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(12,8,24,.5), rgba(12,8,24,.82)); color: #f4efe6; text-align: center; }
+  #gameTitle { font-size: 74px; font-weight: 900; letter-spacing: 4px; background: linear-gradient(180deg, #ffd23d, #ff7e3d 55%, #ff4d6d); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 4px 30px rgba(255,126,61,.35); margin: 0; font-family: 'Arial Black', Arial, sans-serif; }
+  #gameSub { font-size: 13px; letter-spacing: 4px; color: #35d0ba; margin: 6px 0 26px; }
+  .menuBtn { pointer-events: auto; cursor: pointer; font-size: 16px; font-weight: 800; letter-spacing: 2px; color: #20140a; background: linear-gradient(180deg, #ffd23d, #ff9e3d); border: none; border-radius: 8px; padding: 12px 44px; margin: 6px; min-width: 240px; }
+  .menuBtn.ghost { background: rgba(255,255,255,.12); color: #f4efe6; border: 1px solid rgba(255,255,255,.3); }
+  #startControls { margin-top: 26px; display: grid; grid-template-columns: repeat(3, auto); gap: 5px 22px; font-size: 11px; color: #b8b2a6; }
+  #startControls b { color: #ffd23d; }
+  #startFoot { position: absolute; bottom: 16px; font-size: 10px; letter-spacing: 1px; color: #7d8590; }
+  #overlay { background: rgba(12,8,24,.66); }
+  #overlayTitle { font-size: 84px; font-weight: 900; letter-spacing: 8px; color: #ff5e4d; font-family: 'Arial Black', Arial, sans-serif; }
+  #overlaySub { font-size: 14px; color: #d8d2c6; letter-spacing: 1px; }
+  #pauseTitle { font-size: 44px; font-weight: 900; letter-spacing: 6px; color: #ffd23d; }
   #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #testout { position: fixed; top: 0; left: 0; z-index: 99; color: #0f0; background: #000; font: 11px monospace; white-space: pre; }
 </style>
 </head>
 <body>
-<canvas id="game" aria-label="Block Dodger: move the paddle left and right to dodge falling blocks and catch coins"></canvas>
+<canvas id="game" aria-label="Solstice Heat: an open-world crime game set in Solstice Bay"></canvas>
 <p id="status" role="status" aria-live="polite"></p>
-<script type="module" src="./src/main.js"></script>
+<div id="vignette"></div>
+<div id="hud" class="hidden">
+  <div id="missionPanel" class="panel">
+    <div id="mpJob">JOB 1/7</div>
+    <div id="mpName">HOT WHEELS</div>
+    <div id="mpObjective">Boost the Vela Sedan on the curb</div>
+    <div id="mpStageRow"><div id="mpStageBar"><div id="mpStageFill"></div></div><span id="mpStageText">STAGE 1/2</span><span id="mpProgress"></span><span id="mpTimer"></span></div>
+  </div>
+  <div id="wantedBox" class="panel"><div id="wantedLabel">CLEAN</div><div id="stars"></div></div>
+  <div id="statsBox" class="panel"><div id="cash">$500</div><div id="clockRow"><span id="day">FRI</span> <span id="clock">18:42</span></div></div>
+  <div id="policePanel" class="panel hidden"><div id="ppTitle">SBPD RESPONSE</div><div id="ppUnits"></div></div>
+  <div id="weaponBar"></div>
+  <div id="minimapWrap"><canvas id="minimap" width="176" height="176"></canvas></div>
+  <div id="playerBox" class="panel">
+    <img id="rafaPortrait" alt="Rafa Solis">
+    <div id="playerBars">
+      <div class="bar"><div id="healthFill"></div></div>
+      <div class="bar"><div id="respectFill"></div></div>
+      <div id="respectRank">RESPECT — NEW BLOOD</div>
+      <div id="respectNum">0 RP</div>
+    </div>
+  </div>
+  <div id="location">Costa Dorada · Solstice Bay</div>
+  <div id="dialogueBox" class="panel hidden">
+    <img id="dlgPortrait" alt="contact portrait">
+    <div><div id="dlgName">TERE SOLANO</div><div id="dlgText"></div></div>
+  </div>
+  <div id="vehiclePanel" class="panel">
+    <div id="vpMode">DRIVING</div>
+    <div id="vpName">MERIDIAN GT</div>
+    <div id="vpSpeedRow"><span id="vpSpeed">0</span> <small>km/h</small></div>
+    <div id="vpCondBar"><div id="vpCondFill" class="good"></div></div>
+    <div id="vpCondText">CONDITION 100%</div>
+    <div id="radioStation">SOLSTICE FM 98.1</div>
+    <div id="radioTrack">Golden Hour Mix</div>
+  </div>
+  <div id="toast" class="hidden"></div>
+  <div id="crosshair" class="hidden"></div>
+  <div id="hints"></div>
+</div>
+<div id="startScreen" class="screen">
+  <h1 id="gameTitle">SOLSTICE HEAT</h1>
+  <div id="gameSub">A SOLSTICE BAY STORY · RAFA SOLIS IS THE WHEELMAN</div>
+  <button id="btnNew" class="menuBtn">NEW GAME</button>
+  <button id="btnContinue" class="menuBtn ghost">CONTINUE</button>
+  <div id="startControls">
+    <span><b>W A S D</b> drive / walk</span><span><b>SHIFT</b> sprint</span><span><b>SPACE</b> handbrake</span>
+    <span><b>F</b> enter / steal car</span><span><b>MOUSE / J</b> shoot</span><span><b>1-5</b> weapons</span>
+    <span><b>R</b> reload</span><span><b>Q E</b> camera</span><span><b>V</b> radio</span>
+  </div>
+  <div id="startFoot">SEVEN JOBS · ONE CITY · CLEAR YOUR NAME — built for make.fun gta6-01 · three.js · fully offline</div>
+</div>
+<div id="pauseScreen" class="screen hidden">
+  <div id="pauseTitle">PAUSED</div>
+  <button id="btnResume" class="menuBtn">RESUME</button>
+  <button id="btnQuit" class="menuBtn ghost">SAVE &amp; QUIT</button>
+</div>
+<div id="overlay" class="screen hidden">
+  <div id="overlayTitle">BUSTED</div>
+  <div id="overlaySub"></div>
+  <button id="btnOverlay" class="menuBtn ghost hidden">OK</button>
+</div>
+<pre id="testout" class="hidden"></pre>
+<script src="./vendor/three.min.js"></script>
+<script src="./src/config.js"></script>
+<script src="./src/input.js"></script>
+<script src="./src/audio.js"></script>
+<script src="./src/city.js"></script>
+<script src="./src/vehicles.js"></script>
+<script src="./src/pedestrians.js"></script>
+<script src="./src/effects.js"></script>
+<script src="./src/police.js"></script>
+<script src="./src/combat.js"></script>
+<script src="./src/missions.js"></script>
+<script src="./src/player.js"></script>
+<script src="./src/hud.js"></script>
+<script src="./src/save.js"></script>
+<script src="./src/shots.js"></script>
+<script src="./src/main.js"></script>
 </body>
 </html>
